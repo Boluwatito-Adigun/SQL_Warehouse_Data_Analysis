@@ -28,7 +28,10 @@ FROM gold_dim_customers;
 
 
 SELECT
-    Extract(YEAR FROM AGE( MAX(birthdate)))
+    MIN(birthdate) AS oldest_birthdate,
+    Extract(YEAR FROM AGE( MIN(birthdate))) AS oldest_age,
+    MAX(birthdate) AS youngest_birthdate,
+    Extract(YEAR FROM AGE( MAX(birthdate))) AS youngest_age
 FROM 
     gold_dim_customers;
 
