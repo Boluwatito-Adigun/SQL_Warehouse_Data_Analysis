@@ -37,216 +37,322 @@ For this project, I employed several key tools which are;
     - Filtering and Sorting: GROUP BY, ORDER BY, LIMIT, DISTINCT, JOIN
 
 # The Analysis
-Each query for this project aimed at investigating specific aspects of the data analyst job market. Here's how I approached each question:
+Here's how I approached each question:
 
-### 1. Top Paying Data Analyst Job
-This section highlights the highest-paying roles within the data analytics field. I filtered data analyst positions by average yearly salary and location, focusing on remote jobs.This query highlights the high paying opportunities in the field.
+### 1. Database Exploration
+
+Retrieved the list of tables and their schemas using INFORMATION_SCHEMA.TABLES.
+
+Inspected columns, data types, and metadata to understand table relationships.
 
 ```sql
+-- Retrieve a list of all tables in the database
+SELECT 
+    TABLE_CATALOG, 
+    TABLE_SCHEMA, 
+    TABLE_NAME, 
+    TABLE_TYPE
+FROM INFORMATION_SCHEMA.TABLES;
+
+-- Retrieve all columns for a specific table (gold_dim_customers)
+SELECT 
+    COLUMN_NAME, 
+    DATA_TYPE, 
+    IS_NULLABLE, 
+    CHARACTER_MAXIMUM_LENGTH
+FROM INFORMATION_SCHEMA.COLUMNS
+WHERE TABLE_NAME = 'gold_dim_customers';
+
+
+```
+
+### 2. Dimensions Exploration
+
+Identified key dimensions such as country, category, and product name.
+
+Used DISTINCT queries to view unique values and understand grouping opportunities for future analysis.
+
+```sql
+-- Retrieve a list of unique countries from which customers originate
+SELECT DISTINCT country
+FROM gold_dim_customers
+ORDER BY country;
+
+-- Retrieve a list of unique categories, subcategories, and products
+SELECT DISTINCT 
+    category,
+    subcategory, 
+    product_name 
+FROM gold_dim_products
+ORDER BY category, subcategory, product_name;
+```
+
+### 3. Date Range Exploration
+
+Determined the earliest and latest order dates to understand the time span of the data.
+
+Calculated age ranges of customers using date functions.
+```sql
+-- Determine the first and last order date and the total duration in months
+SELECT 
+    MIN(order_date) AS first_order_date,
+    MAX(order_date) AS last_order_date,
+    Extract(YEAR FROM MAX(order_date)) - Extract(YEAR FROM MIN(order_date)) AS order_range_year
+FROM gold_fact_sales;
+
+-- Find the youngest and oldest customer based on birthdate
 SELECT
-    job_id,
-    job_title,
-    job_location,
-    job_schedule_type,
-    salary_year_avg,
-    job_posted_date,
-    name AS company_name
-FROM
-    job_postings_fact
-LEFT JOIN company_dim
-ON job_postings_fact.company_id = company_dim.company_id
+    MIN(birthdate) AS oldest_birthdate,
+    Extract(YEAR FROM MIN(birthdate)) AS oldest_age,
+    MAX(birthdate) AS youngest_birthdate,
+    Extract(YEAR FROM MAX(birthdate) ) AS youngest_age
+FROM gold_dim_customers;
 
-WHERE 
-    job_title_short = 'Data Analyst' AND
-    job_location = 'Anywhere' AND
-    salary_year_avg IS NOT NULL
-ORDER BY
-    salary_year_avg DESC
-LIMIT 10;
+
+SELECT
+    MIN(birthdate) AS oldest_birthdate,
+    Extract(YEAR FROM AGE( MIN(birthdate))) AS oldest_age,
+    MAX(birthdate) AS youngest_birthdate,
+    Extract(YEAR FROM AGE( MAX(birthdate))) AS youngest_age
+FROM 
+    gold_dim_customers;
 
 ```
-Here's the breakdown of the top Data Analyst jobs in 2023:
-- **Wide Salary Range:** Top 10 paying data analyst roles span from $184,000 to $650,000, indicating significant salary potential in the field.  
-- **Diverse Employers:** Companies like SmartAsset, Meta, and AT&T are among those offering high salaries, showing a broad interest across different industries.
-- **Job Title Variety:** There's a high diversity in job titles, from Data Analyst to Director of Analytics, reflecting varied roles and specializations within data analytics.
 
-### 2. Skills for Top Paying Jobs
-To understand what skills are required for the top-paying jobs, I joined the job postings with the skills data, providing insights into what employers value for high-compensation roles.
+### 4. Measures Exploration (Key Metrics)
+
+Generated quick insights on key business metrics such as:
+
+- 🛒 Total Sales
+
+- 📦 Total Quantity Sold
+
+- 💰 Average Selling Price
+
+- 🧾 Total Orders
+
+- 👥 Total Customers and Active Customers
+
+- 🧍‍♂️ Total Products
 
 ```sql
-WITH top_paying_jobs AS 
-(
-    SELECT
-        job_id,
-        job_title,
-        salary_year_avg,
-        name AS company_name
-    FROM
-        job_postings_fact
-    LEFT JOIN company_dim
-    ON job_postings_fact.company_id = company_dim.company_id
+-- Find the Total Sales
+SELECT SUM(sales_amount) AS total_sales FROM gold_fact_sales
 
-    WHERE 
-        job_title_short = 'Data Analyst' AND
-        job_location = 'Anywhere' AND
-        salary_year_avg IS NOT NULL
-    ORDER BY
-        salary_year_avg DESC
-    LIMIT 10
-)
+-- Find how many items are sold
+SELECT SUM(quantity) AS total_quantity FROM gold_fact_sales
 
-SELECT 
-    top_paying_jobs.*,
-    skills
-FROM top_paying_jobs
-JOIN skills_job_dim
-    ON top_paying_jobs.job_id = skills_job_dim.job_id
-JOIN skills_dim
-    ON skills_job_dim.skill_id = skills_dim.skill_id
-ORDER BY
-    salary_year_avg DESC;
+-- Find the average selling price
+SELECT AVG(price) AS avg_price FROM gold_fact_sales
+
+-- Find the Total number of Orders
+SELECT COUNT(DISTINCT order_number) AS total_orders FROM gold_fact_sales
+
+-- Find the total number of products
+SELECT COUNT(product_name) AS total_products FROM gold_dim_products
+
+-- Find the total number of customers
+SELECT COUNT(customer_key) AS total_customers FROM gold_dim_customers;
+
+-- Find the total number of customers that has placed an order
+SELECT COUNT(DISTINCT customer_key) AS total_customers FROM gold_fact_sales;
+
+-- Generate a Report that shows all key metrics of the business
+SELECT 'Total Sales' AS measure_name, SUM(sales_amount) AS measure_value FROM gold_fact_sales
+UNION ALL
+SELECT 'Total Quantity', SUM(quantity) FROM gold_fact_sales
+UNION ALL
+SELECT 'Average Price', AVG(price) FROM gold_fact_sales
+UNION ALL
+SELECT 'Total Orders', COUNT(DISTINCT order_number) FROM gold_fact_sales
+UNION ALL
+SELECT 'Total Products', COUNT(DISTINCT product_name) FROM gold_dim_products
+UNION ALL
+SELECT 'Total Customers', COUNT(customer_key) FROM gold_dim_customers;
+
 ```
 
-Here's the breakdown of the most demanded skills for the top 10 highest paying data analyst jobs in 2023:
-- SQL is leading with a bold count of 8.
-- Python follows closely with a bold count of 7.
-- Tableau is also highly sought after, with a bold count of 6. Other skills like R, Snowflake, Pandas, and Excel show varying degrees of demand.
+### 5. Magnitude Analysis
 
-### 3. In-Demand Skills for Data Analysts
-This query helped identify the skills most frequently requested in job postings, directing focus to areas with high demand.
+Grouped and summarized data to understand patterns across dimensions:
+
+- Total customers by country and gender
+
+- Total products and average cost by category
+
+- Total revenue by category and customer
+
+- Distribution of sold items across countries
 
 ```sql
-SELECT 
-   skills,
-   COUNT(skills_job_dim.job_id) AS demand_count
-FROM job_postings_fact
-JOIN skills_job_dim
-    ON job_postings_fact.job_id = skills_job_dim.job_id
-JOIN skills_dim
-    ON skills_job_dim.skill_id = skills_dim.skill_id
-WHERE
-    job_title_short = 'Data Analyst' AND
-    job_work_from_home = TRUE
-GROUP BY
-    skills
-ORDER BY 
-    demand_count DESC
+
+-- Find total customers by countries
+SELECT
+    country,
+    COUNT(customer_key) AS total_customers
+FROM gold_dim_customers
+GROUP BY country
+ORDER BY total_customers DESC;
+
+-- Find total customers by gender
+SELECT
+    gender,
+    COUNT(customer_key) AS total_customers
+FROM gold_dim_customers
+GROUP BY gender
+ORDER BY total_customers DESC;
+
+-- Find total products by category
+SELECT
+    category,
+    COUNT(product_key) AS total_products
+FROM gold_dim_products
+GROUP BY category
+ORDER BY total_products DESC;
+
+-- What is the average costs in each category?
+SELECT
+    category,
+    ROUND(AVG(cost),0)AS avg_cost
+FROM gold_dim_products
+GROUP BY category
+ORDER BY avg_cost DESC;
+
+-- What is the total revenue generated for each category?
+SELECT
+    p.category,
+    SUM(f.sales_amount) AS total_revenue
+FROM gold_fact_sales f
+LEFT JOIN gold_dim_products p
+    ON p.product_key = f.product_key
+GROUP BY p.category
+ORDER BY total_revenue DESC;
+
+
+-- What is the total revenue generated by each customer?
+SELECT
+    c.customer_key,
+    concat(c.first_name, ' ' , c.last_name) AS Full_name,
+    SUM(f.sales_amount) AS total_revenue
+FROM gold_fact_sales f
+LEFT JOIN gold_dim_customers c
+    ON c.customer_key = f.customer_key
+GROUP BY 
+    c.customer_key,
+    Full_name
+ORDER BY total_revenue DESC;
+
+-- What is the distribution of sold items across countries?
+SELECT
+    c.country,
+    SUM(f.quantity) AS total_sold_items
+FROM gold.fact_sales f
+LEFT JOIN gold.dim_customers c
+    ON c.customer_key = f.customer_key
+GROUP BY c.country
+ORDER BY total_sold_items DESC;
+
+```
+
+### 6. Ranking Analysis
+
+-Applied ranking functions to highlight top and bottom performers:
+
+- Top 5 products generating the highest revenue
+
+- Bottom 5 products with the lowest sales
+
+- Top 10 customers by revenue contribution
+
+- 3 customers with the fewest orders
+
+```sql
+-- Which 5 products Generating the Highest Revenue?
+-- Simple Ranking
+SELECT
+    p.product_name,
+    SUM(s.sales_amount) AS total_revenue
+FROM gold_fact_sales s
+LEFT JOIN gold_dim_products p
+    ON p.product_key = s.product_key
+GROUP BY p.product_name
+ORDER BY total_revenue DESC
 LIMIT 5;
 
-```
+-- Complex but Flexibly Ranking Using Window Functions
+SELECT *
+FROM (
+    SELECT
+        p.product_name,
+        SUM(s.sales_amount) AS total_revenue,
+        RANK() OVER (ORDER BY SUM(s.sales_amount) DESC) AS rank_products
+    FROM gold_fact_sales s
+    LEFT JOIN gold_dim_products p
+        ON p.product_key = s.product_key
+    GROUP BY p.product_name
+) AS ranked_products
+WHERE rank_products <= 5;
 
-Here's the breakdown of the most demanded skills for data analysts in 2023
-
-- SQL and Excel remain fundamental, emphasizing the need for strong foundational skills in data processing and spreadsheet manipulation.
-- Programming and Visualization Tools like Python, Tableau, and Power BI are essential, pointing towards the increasing importance of technical skills in data storytelling and decision support.
-
-### 4. Skills Based on Salary
-Exploring the average salaries associated with different skills revealed which skills are the highest paying.
-
-```sql
-SELECT 
-   skills,
-   ROUND(AVG(salary_year_avg),0) AS average_salary
-FROM job_postings_fact
-JOIN skills_job_dim
-    ON job_postings_fact.job_id = skills_job_dim.job_id
-JOIN skills_dim
-    ON skills_job_dim.skill_id = skills_dim.skill_id
-WHERE
-    job_title_short = 'Data Analyst'
-    AND salary_year_avg IS NOT NULL
-    AND job_work_from_home = TRUE
-GROUP BY
-    skills
-ORDER BY 
-    average_salary DESC
-LIMIT 25;
-```
-Here's a breakdown of the results for top paying skills for Data Analysts:
-
-- **High Demand for Big Data & ML Skills:** Top salaries are commanded by analysts skilled in big data technologies (PySpark, Couchbase), machine learning tools (DataRobot, Jupyter), and Python libraries (Pandas, NumPy), reflecting the industry's high valuation of data processing and predictive modeling capabilities.
-- **Software Development & Deployment Proficiency:** Knowledge in development and deployment tools (GitLab, Kubernetes, Airflow) indicates a lucrative crossover between data analysis and engineering, with a premium on skills that facilitate automation and efficient data pipeline management.
-- **Cloud Computing Expertise:** Familiarity with cloud and data engineering tools (Elasticsearch, Databricks, GCP) underscores the growing importance of cloud-based analytics environments, suggesting that cloud proficiency significantly boosts earning potential in data analytics.
-
-### 5. Most Optimal Skills to Learn
-Combining insights from demand and salary data, this query aimed to pinpoint skills that are both in high demand and have high salaries, offering a strategic focus for skill development.
-
-```sql
-With top_demanded_skills AS (
-    SELECT 
-        skills_dim.skill_id,
-        skills_dim.skills,
-        COUNT(skills_job_dim.job_id) AS demand_count
-    FROM job_postings_fact
-    JOIN skills_job_dim
-        ON job_postings_fact.job_id = skills_job_dim.job_id
-    JOIN skills_dim
-        ON skills_job_dim.skill_id = skills_dim.skill_id
-    WHERE
-        job_title_short = 'Data Analyst' AND
-        job_work_from_home = TRUE  AND 
-        salary_year_avg IS NOT NULL
-    GROUP BY
-        skills_dim.skill_id
-    
-), top_paying_skills AS (
-    SELECT 
-        skills_dim.skill_id,
-        ROUND(AVG(salary_year_avg),0) AS average_salary
-    FROM job_postings_fact
-    JOIN skills_job_dim
-        ON job_postings_fact.job_id = skills_job_dim.job_id
-    JOIN skills_dim
-        ON skills_job_dim.skill_id = skills_dim.skill_id
-    WHERE
-        job_title_short = 'Data Analyst'
-        AND salary_year_avg IS NOT NULL
-        AND job_work_from_home = TRUE
-    GROUP BY
-        skills_dim.skill_id
-)
-
+-- What are the 5 worst-performing products in terms of sales?
 SELECT
-    top_demanded_skills.skill_id,
-    top_demanded_skills.skills,
-    demand_count,
-    average_salary
-FROM
-    top_demanded_skills
-JOIN top_paying_skills
-ON top_demanded_skills.skill_id = top_paying_skills.skill_id
-WHERE
-    demand_count > 10
-ORDER BY 
-    average_salary DESC,
-    demand_count DESC
-LIMIT 25;
+    p.product_name,
+    SUM(s.sales_amount) AS total_revenue
+FROM gold_fact_sales s
+LEFT JOIN gold_dim_products p
+    ON p.product_key = s.product_key
+GROUP BY p.product_name
+ORDER BY total_revenue
+LIMIT 5;
+
+-- Find the top 10 customers who have generated the highest revenue
+SELECT 
+    c.customer_key,
+    concat( c.first_name, ' ', c.last_name) AS full_name,
+    SUM(s.sales_amount) AS total_revenue
+FROM gold_fact_sales s
+LEFT JOIN gold_dim_customers c
+    ON c.customer_key = s.customer_key
+GROUP BY 
+    c.customer_key,
+    full_name
+ORDER BY total_revenue DESC
+LIMIT 10;
+
+-- The 3 customers with the fewest orders placed
+SELECT
+    c.customer_key,
+    concat( c.first_name, ' ', c.last_name) AS full_name,
+    COUNT(DISTINCT order_number) AS total_orders
+FROM gold_fact_sales s
+LEFT JOIN gold_dim_customers c
+    ON c.customer_key = s.customer_key
+GROUP BY 
+    c.customer_key,
+    full_name
+ORDER BY total_orders 
+LIMIT 3;
 ```
 
-Here's a breakdown of the most optimal skills for Data Analysts in 2023:
-
-- **High-Demand Programming Languages:** Python and R stand out for their high demand, with demand counts of 236 and 148 respectively. Despite their high demand, their average salaries are around $101,397 for Python and $100,499 for R, indicating that proficiency in these languages is highly valued but also widely available.
-- **Cloud Tools and Technologies:** Skills in specialized technologies such as Snowflake, Azure, AWS, and BigQuery show significant demand with relatively high average salaries, pointing towards the growing importance of cloud platforms and big data technologies in data analysis.
-- **Business Intelligence and Visualization Tools:** Tableau and Looker, with demand counts of 230 and 49 respectively, and average salaries around $99,288 and $103,795, highlight the critical role of data visualization and business intelligence in deriving actionable insights from data.
-- **Database Technologies:** The demand for skills in traditional and NoSQL databases (Oracle, SQL Server, NoSQL) with average salaries ranging from $97,786 to $104,534, reflects the enduring need for data storage, retrieval, and management expertise.
 
 # What I learned
 
-Throughout this project, I greatly improved my SQL skills and learned how to work with data more effectively:
-
-- **Complex Queries:** I learned how to write advanced SQL queries, combine data from different tables, and use WITH clauses to create temporary tables.
-- **Data Aggregation:** I became confident using GROUP BY and functions like COUNT() and AVG() to summarize and analyze data.
-- **Analytical Thinking:** I strengthened my ability to solve real-world problems by turning questions into useful, meaningful SQL queries.
+- **Project Type:** Data Exploration & Analysis
+- **Language Used:**	SQL
+- **Focus Areas:**	Sales Performance, Customer Analysis, Product Insights
+- **Skills Practiced:**	Database exploration, aggregation, ranking, joins, and date functions
+- **Learning Outcome:**	Strengthened understanding of SQL for real-world business data analysis
 
 # Conclusions
 
 From the analysis, several general insights emerged:
 
-- **Top-Paying Data Analyst Jobs:** The highest-paying jobs for data analysts that allow remote work offer a wide range of salaries, the highest at $650,000!
-Skills for Top-Paying Jobs: High-paying data analyst jobs require advanced proficiency in SQL, suggesting it’s a critical skill for earning a top salary.
-- **Most In-Demand Skills:** SQL is also the most demanded skill in the data analyst job market, thus making it essential for job seekers.
-- **Skills with Higher Salaries:** Specialized skills, such as SVN and Solidity, are associated with the highest average salaries, indicating a premium on niche expertise.
-- **Optimal Skills for Job Market Value:** SQL leads in demand and offers for a high average salary, positioning it as one of the most optimal skills for data analysts to learn to maximize their market value.
+- The database is well-structured with clear relationships between customers, products, and sales.
 
-# Summary
-This project enhanced my SQL skills and provided valuable insights into the data analyst job market. The findings from the analysis serve as a guide to prioritizing skill development and job search efforts. Aspiring data analysts can better position themselves in a competitive job market by focusing on high-demand, high-salary skills. This exploration highlights the importance of continuous learning and adaptation to emerging trends in the field of data analytics.
+- A few product categories generate the majority of sales revenue.
+
+- There is variation in customer distribution by country and gender.
+
+- The use of SQL window functions helped efficiently identify top and low performers.
+
+This project improved my ability to explore unfamiliar datasets, identify key business metrics, and communicate data-driven insights using SQL.
+
