@@ -4,7 +4,7 @@ The goal was to perform data exploration and analysis on a company’s sales dat
 
 Through this project, I practiced using SQL for data exploration, aggregation, and ranking. I also focused on improving my ability to extract insights from raw data and present them in a clear and structured format
 
-SQL Queries? Check them out here: [project_sql_folder](/project_scripts/)
+SQL Queries? Check them out here: [project_sql_folder](/Project_scripts/)
 
 # Background
 
